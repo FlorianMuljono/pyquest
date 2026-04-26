@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PyQuest</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=EB+Garamond:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --navy: #0a0e1f;
+    --navy-deep: #050814;
+    --gold: #d4af37;
+    --gold-bright: #f4d76a;
+    --gold-dim: #8a7028;
+    --parchment: #e8d9a8;
+    --ember: #c84545;
+  }
+
+  html, body {
+    height: 100%;
+    background: radial-gradient(ellipse at center, #121835 0%, var(--navy) 50%, var(--navy-deep) 100%);
+    color: var(--parchment);
+    font-family: 'EB Garamond', 'Times New Roman', serif;
+    font-size: 18px;
+    overflow: hidden;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(circle at 50% 60%, transparent 0%, rgba(0,0,0,0.35) 70%, rgba(0,0,0,0.7) 100%);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  /* Loading curtain */
+  #loading {
+    position: fixed;
+    inset: 0;
+    background: var(--navy-deep);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    transition: opacity 1s ease;
+  }
+  #loading.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  #loading-text {
+    color: var(--gold-dim);
+    font-family: 'Cinzel', serif;
+    font-size: 1.4rem;
+    letter-spacing: 0.18em;
+    text-align: center;
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 0.35; text-shadow: none; }
+    50%      { opacity: 1; color: var(--gold); text-shadow: 0 0 18px rgba(212, 175, 55, 0.45); }
+  }
+
+  /* Stage */
+  #stage {
+    position: relative;
+    height: 100%;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    opacity: 0;
+    transition: opacity 1.2s ease;
+  }
+  #stage.visible { opacity: 1; }
+
+  #title {
+    font-family: 'Cinzel', serif;
+    font-size: 3rem;
+    font-weight: 700;
+    color: var(--gold);
+    letter-spacing: 0.22em;
+    margin-bottom: 3rem;
+    text-shadow: 0 0 24px rgba(212, 175, 55, 0.35);
+  }
+
+  /* Scene */
+  #scene {
+    max-width: 640px;
+    width: 100%;
+    text-align: center;
+    transition: opacity 1.1s ease, transform 1.1s ease;
+  }
+  #scene.faded {
+    opacity: 0;
+    transform: translateY(-24px);
+    pointer-events: none;
+  }
+
+  #story {
+    font-style: italic;
+    font-size: 1.3rem;
+    color: var(--parchment);
+    margin-bottom: 2.5rem;
+    line-height: 1.55;
+    text-shadow: 0 0 12px rgba(0,0,0,0.6);
+  }
+
+  #scaffold {
+    font-family: 'Courier New', monospace;
+    font-size: 1.5rem;
+    background: rgba(212, 175, 55, 0.05);
+    border: 1px solid var(--gold-dim);
+    border-radius: 4px;
+    padding: 1.5rem 1rem;
+    color: var(--parchment);
+    margin-bottom: 1.75rem;
+    letter-spacing: 0.04em;
+    box-shadow: inset 0 0 24px rgba(212, 175, 55, 0.06);
+  }
+  #scaffold .keyword { color: var(--gold); }
+  #scaffold .quote { color: var(--gold-bright); }
+
+  #blank {
+    background: rgba(212, 175, 55, 0.1);
+    border: none;
+    border-bottom: 2px solid var(--gold);
+    color: var(--gold-bright);
+    font-family: inherit;
+    font-size: inherit;
+    padding: 0.2rem 0.6rem;
+    width: 14rem;
+    text-align: center;
+    outline: none;
+    transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+  }
+  #blank::placeholder { color: rgba(232, 217, 168, 0.35); font-style: italic; }
+  #blank:focus {
+    background: rgba(212, 175, 55, 0.18);
+    border-bottom-color: var(--gold-bright);
+    box-shadow: 0 4px 16px -4px rgba(244, 215, 106, 0.4);
+  }
+  #blank.shake {
+    animation: shake 0.45s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+    border-bottom-color: var(--ember);
+    background: rgba(200, 69, 69, 0.18);
+  }
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    15%, 55% { transform: translateX(-9px); }
+    35%, 75% { transform: translateX(9px); }
+  }
+
+  #cast {
+    font-family: 'Cinzel', serif;
+    font-size: 1.05rem;
+    letter-spacing: 0.2em;
+    background: transparent;
+    color: var(--gold);
+    border: 1px solid var(--gold);
+    padding: 0.85rem 2.6rem;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s, box-shadow 0.2s, transform 0.1s;
+    text-transform: uppercase;
+  }
+  #cast:hover:not(:disabled) {
+    background: rgba(212, 175, 55, 0.18);
+    color: var(--gold-bright);
+    box-shadow: 0 0 22px rgba(212, 175, 55, 0.4);
+  }
+  #cast:active:not(:disabled) { transform: scale(0.96); }
+  #cast:disabled { opacity: 0.4; cursor: default; }
+
+  #fizzle {
+    margin-top: 1.5rem;
+    color: var(--ember);
+    font-style: italic;
+    font-size: 1rem;
+    min-height: 1.4rem;
+    opacity: 0;
+    transition: opacity 0.35s ease;
+  }
+  #fizzle.show { opacity: 0.95; }
+
+  /* Gold flash */
+  #flash {
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(circle at center, var(--gold-bright) 0%, var(--gold) 40%, transparent 80%);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 50;
+    mix-blend-mode: screen;
+  }
+  #flash.fire { animation: flash 0.95s ease-out; }
+  @keyframes flash {
+    0%   { opacity: 0; }
+    18%  { opacity: 1; }
+    100% { opacity: 0; }
+  }
+
+  /* Victory message */
+  #victory {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem;
+    z-index: 60;
+    opacity: 0;
+    transform: scale(0.55);
+    pointer-events: none;
+  }
+  #victory.show {
+    animation: arise 1.8s cubic-bezier(0.18, 0.7, 0.28, 1) forwards;
+    animation-delay: 0.45s;
+  }
+  @keyframes arise {
+    0%   { opacity: 0; transform: scale(0.55); filter: blur(8px); }
+    60%  { opacity: 1; filter: blur(0); }
+    100% { opacity: 1; transform: scale(1); filter: blur(0); }
+  }
+  #victory .text {
+    max-width: 720px;
+    text-align: center;
+    font-family: 'Cinzel', serif;
+    font-size: 1.7rem;
+    line-height: 1.65;
+    color: var(--gold-bright);
+    text-shadow: 0 0 28px rgba(244, 215, 106, 0.55), 0 0 60px rgba(212, 175, 55, 0.35);
+    letter-spacing: 0.06em;
+  }
+  #victory .text em {
+    display: block;
+    margin-top: 1.3rem;
+    font-family: 'EB Garamond', serif;
+    font-style: italic;
+    font-size: 1.25rem;
+    color: var(--parchment);
+    letter-spacing: 0.02em;
+    text-shadow: 0 0 14px rgba(0,0,0,0.6);
+  }
+</style>
+</head>
+<body>
+
+<div id="loading"><div id="loading-text">Loading the ancient scrolls...</div></div>
+
+<div id="stage">
+  <h1 id="title">PyQuest</h1>
+  <div id="scene">
+    <p id="story">A rune pulses on the floor. Speak your name into it.</p>
+    <div id="scaffold"><span class="keyword">print</span>(<span class="quote">"</span><input id="blank" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="your name"><span class="quote">"</span>)</div>
+    <button id="cast" disabled>Cast</button>
+    <div id="fizzle"></div>
+  </div>
+</div>
+
+<div id="flash"></div>
+<div id="victory"><div class="text">The rune blazes. The path opens.<em>You have spoken your first spell. The world remembers you.</em></div></div>
+
+<script src="https://cdn.jsdelivr.net/pyodide/v0.28.0/full/pyodide.js"></script>
+<script>
+(async () => {
+  const loading = document.getElementById('loading');
+  const stage   = document.getElementById('stage');
+  const scene   = document.getElementById('scene');
+  const blank   = document.getElementById('blank');
+  const cast    = document.getElementById('cast');
+  const fizzle  = document.getElementById('fizzle');
+  const flash   = document.getElementById('flash');
+  const victory = document.getElementById('victory');
+
+  let pyodide;
+  try {
+    pyodide = await loadPyodide();
+  } catch (e) {
+    document.getElementById('loading-text').textContent = 'The scrolls would not unfurl. Refresh the page.';
+    return;
+  }
+
+  loading.classList.add('hidden');
+  stage.classList.add('visible');
+  cast.disabled = false;
+  setTimeout(() => blank.focus(), 900);
+
+  const escapeForLiteral = (s) =>
+    s.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+
+  let busy = false;
+  let won  = false;
+
+  async function attempt() {
+    if (busy || won) return;
+    const value = blank.value;
+    if (!value.trim()) {
+      showFizzle('The rune waits. Speak something into it.');
+      shake();
+      return;
+    }
+    busy = true;
+    fizzle.classList.remove('show');
+
+    let captured = '';
+    pyodide.setStdout({ batched: (s) => { captured += s + '\n'; } });
+
+    const program = `print("${escapeForLiteral(value)}")`;
+    let ran = true;
+    try {
+      await pyodide.runPythonAsync(program);
+    } catch (e) {
+      ran = false;
+    } finally {
+      pyodide.setStdout({});
+    }
+
+    if (ran && captured.trim().length > 0) {
+      triumph();
+    } else {
+      showFizzle('The spell fizzled. Try again.');
+      shake();
+      busy = false;
+    }
+  }
+
+  function showFizzle(msg) {
+    fizzle.textContent = msg;
+    fizzle.classList.add('show');
+  }
+
+  function shake() {
+    blank.classList.remove('shake');
+    void blank.offsetWidth;
+    blank.classList.add('shake');
+    setTimeout(() => blank.classList.remove('shake'), 550);
+  }
+
+  function triumph() {
+    won = true;
+    cast.disabled = true;
+    blank.disabled = true;
+    flash.classList.remove('fire');
+    void flash.offsetWidth;
+    flash.classList.add('fire');
+    setTimeout(() => scene.classList.add('faded'), 220);
+    setTimeout(() => victory.classList.add('show'), 650);
+  }
+
+  cast.addEventListener('click', attempt);
+  blank.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); attempt(); }
+  });
+  blank.addEventListener('input', () => {
+    if (fizzle.classList.contains('show')) fizzle.classList.remove('show');
+  });
+})();
+</script>
+
+</body>
+</html>
