@@ -248,9 +248,37 @@
     letter-spacing: 0.02em;
     text-shadow: 0 0 14px rgba(0,0,0,0.6);
   }
+
+  /* XP counter */
+  #xp {
+    position: fixed;
+    top: 1.4rem;
+    right: 1.8rem;
+    z-index: 70;
+    font-family: 'Cinzel', serif;
+    font-size: 0.85rem;
+    letter-spacing: 0.22em;
+    color: var(--gold);
+    opacity: 0.78;
+    text-shadow: 0 0 14px rgba(212, 175, 55, 0.35);
+    pointer-events: none;
+    text-transform: uppercase;
+    transform-origin: right center;
+    transform: scale(1);
+  }
+  #xp.pulse {
+    animation: xp-pulse 0.3s cubic-bezier(0.25, 0.7, 0.4, 1.2);
+  }
+  @keyframes xp-pulse {
+    0%   { transform: scale(1);   color: var(--gold); }
+    50%  { transform: scale(1.2); color: var(--gold-bright); }
+    100% { transform: scale(1);   color: var(--gold); }
+  }
 </style>
 </head>
 <body>
+
+<div id="xp">Arcane Knowledge: 0</div>
 
 <div id="loading"><div id="loading-text">Loading the ancient scrolls...</div></div>
 
@@ -297,6 +325,43 @@
 
   let busy = false;
   let won  = false;
+  let encounter = 1; // 1 = rune, 2 = sprite, 3 = finale (no further casts)
+
+  // --- XP / Arcane Knowledge ---------------------------------------------
+  const xpEl = document.getElementById('xp');
+  const SAVE_KEY = 'pyquest.save';
+  let xp = 0;
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed.xp === 'number' && isFinite(parsed.xp)) {
+        xp = parsed.xp;
+      }
+    }
+  } catch (e) { /* ignore corrupted save */ }
+  function renderXp() { xpEl.textContent = `Arcane Knowledge: ${xp}`; }
+  function persistXp() {
+    try { localStorage.setItem(SAVE_KEY, JSON.stringify({ xp })); }
+    catch (e) { /* private mode etc. */ }
+  }
+  function gainXp(amount) {
+    xp += amount;
+    renderXp();
+    persistXp();
+    xpEl.classList.remove('pulse');
+    void xpEl.offsetWidth;
+    xpEl.classList.add('pulse');
+  }
+  renderXp();
+
+  // --- Encounter 2 / finale text -----------------------------------------
+  const story       = document.getElementById('story');
+  const victoryText = victory.querySelector('.text');
+  const VICTORY_RUNE   = 'The rune blazes. The path opens.<em>You have spoken your first spell. The world remembers you.</em>';
+  const VICTORY_SPRITE = 'The sprite chirps your word back at you and giggles.';
+  const FINALE_HTML    = 'Two spells cast. The path winds deeper into the wood.<em>— Demo build.</em>';
+  const STORY_SPRITE   = 'A small light flickers in the trees. The Echo Sprite waits for a word.';
 
   async function attempt() {
     if (busy || won) return;
@@ -322,10 +387,16 @@
       pyodide.setStdout({});
     }
 
-    if (ran && captured.trim().length > 0) {
+    const passed = encounter === 2
+      ? /hello/i.test(value)
+      : (ran && captured.trim().length > 0);
+
+    if (passed) {
       triumph();
     } else {
-      showFizzle('The spell fizzled. Try again.');
+      showFizzle(encounter === 2
+        ? 'The sprite tilts its head, confused. Try again.'
+        : 'The spell fizzled. Try again.');
       shake();
       busy = false;
     }
@@ -350,8 +421,47 @@
     flash.classList.remove('fire');
     void flash.offsetWidth;
     flash.classList.add('fire');
+    victoryText.innerHTML = encounter === 2 ? VICTORY_SPRITE : VICTORY_RUNE;
     setTimeout(() => scene.classList.add('faded'), 220);
     setTimeout(() => victory.classList.add('show'), 650);
+    gainXp(10);
+    if (encounter === 1)      setTimeout(advanceToSprite, 4500);
+    else if (encounter === 2) setTimeout(showFinale, 4000);
+  }
+
+  function advanceToSprite() {
+    encounter = 2;
+    won = false;
+    busy = false;
+    // smooth fade-out of the victory message before re-arming the scene
+    victory.style.transition = 'opacity 0.7s ease';
+    victory.style.opacity = '0';
+    setTimeout(() => {
+      victory.classList.remove('show');
+      victory.style.transition = '';
+      victory.style.opacity = '';
+      story.textContent = STORY_SPRITE;
+      blank.value = '';
+      blank.disabled = false;
+      blank.placeholder = 'a word';
+      cast.disabled = false;
+      fizzle.classList.remove('show');
+      scene.classList.remove('faded');
+      setTimeout(() => blank.focus(), 700);
+    }, 700);
+  }
+
+  function showFinale() {
+    encounter = 3;
+    // gentle text crossfade — victory remains on screen, content swaps
+    victoryText.style.transition = 'opacity 0.5s ease, transform 0.5s ease';
+    victoryText.style.opacity = '0';
+    victoryText.style.transform = 'translateY(-10px)';
+    setTimeout(() => {
+      victoryText.innerHTML = FINALE_HTML;
+      victoryText.style.transform = 'translateY(0)';
+      victoryText.style.opacity = '1';
+    }, 500);
   }
 
   cast.addEventListener('click', attempt);
